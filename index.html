@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="UTF-8">
+<title>Vermarktungs-Dashboard – Mapraz Parc & Zentrum Worben</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --ink:#1f2430; --muted:#6b7280;
+    --frei:#16a34a; --reserviert:#f59e0b; --belegt:#2563eb;
+    --border:#e5e7eb;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:24px;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1180px;margin:0 auto;}
+  header h1{margin:0 0 4px 0;font-size:26px;}
+  header .sub{color:var(--muted);font-size:14px;}
+  .source-note{margin-top:10px;font-size:12px;color:var(--muted);
+    background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;
+    display:inline-block;}
+  .source-note.warn{background:#fef3c7;color:#92400e;border-color:#fde68a;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:12px;margin:20px 0;}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;}
+  .kpi .label{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .kpi .value{font-size:24px;font-weight:700;}
+  .kpi.frei .value{color:var(--frei);}
+  .kpi.reserviert .value{color:var(--reserviert);}
+  .kpi.belegt .value{color:var(--belegt);}
+  .project-section{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:18px;margin-bottom:20px;}
+  .project-section h2{margin:0 0 4px 0;font-size:17px;}
+  .project-section .meta{color:var(--muted);font-size:12px;margin-bottom:14px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.02em;}
+  tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;}
+  .badge.frei{background:#dcfce7;color:#166534;}
+  .badge.reserviert{background:#fef3c7;color:#92400e;}
+  .badge.belegt{background:#dbeafe;color:#1e40af;}
+  footer{margin-top:20px;font-size:12px;color:var(--muted);text-align:center;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+  @media (max-width:820px){.grid2{grid-template-columns:1fr;}}
+  canvas{max-width:100%;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Vermarktungs-Dashboard</h1>
+    <div class="sub">Mapraz Parc (Vermietung) &middot; Zentrum Worben (Verkauf)</div>
+    <div id="sourceNotes"></div>
+  </header>
+
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="grid2">
+    <div class="project-section">
+      <h2>Status übergreifend</h2>
+      <canvas id="statusChart" width="500" height="240"></canvas>
+    </div>
+    <div class="project-section">
+      <h2>Einheiten pro Projekt</h2>
+      <canvas id="projectChart" width="500" height="240"></canvas>
+    </div>
+  </div>
+
+  <div id="projectTables"></div>
+
+  <footer id="footerNote"></footer>
+</div>
+
+<script>
+const DATA = {"generiert_am": "2026-08-13 08:15:26 UTC", "quellen": {"mapraz_parc": {"url": "https://www.mapraz-parc.ch/louez-votre-appartement-a-mapraz-parc-1413", "status": "fehler", "fehler": "Keine Wohnungen im HTML gefunden (Seitenstruktur evtl. geaendert)", "anzahl": 0}, "zentrum_worben": {"url": "https://salezentrumworben.api.melon.sale/api/v2/objects/", "status": "ok", "fehler": null, "anzahl": 12}}, "verwendete_fallbacks": [], "objekte": [{"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.0.01", "zimmer": 4.5, "flaeche": 106.0, "preis_chf": 770000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Frei", "status": "Frei"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.0.02", "zimmer": 2.5, "flaeche": 66.0, "preis_chf": 520000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Reserviert", "status": "Reserviert"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.0.03", "zimmer": 3.5, "flaeche": 86.0, "preis_chf": 630000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.1.01", "zimmer": 4.5, "flaeche": 106.6, "preis_chf": 760000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.1.02", "zimmer": 3.5, "flaeche": 78.0, "preis_chf": 560000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.1.03", "zimmer": 4.5, "flaeche": 105.0, "preis_chf": 780000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.2.01", "zimmer": 4.5, "flaeche": 106.0, "preis_chf": 770000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.2.02", "zimmer": 3.5, "flaeche": 78.6, "preis_chf": 570000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.2.03", "zimmer": 4.5, "flaeche": 105.2, "preis_chf": 790000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.3.01", "zimmer": 3.5, "flaeche": 104.1, "preis_chf": 710000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.3.02", "zimmer": 3.5, "flaeche": 78.0, "preis_chf": 550000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Verkauft", "status": "Verkauft"}, {"projekt": "Zentrum Worben", "typ_vermarktung": "Verkauf", "gebaeude": "Haus B1", "referenz": "B1.3.03", "zimmer": 4.5, "flaeche": 105.0, "preis_chf": 760000, "preis_einheit": "CHF Kaufpreis", "status_roh": "Frei", "status": "Frei"}]};
+
+function chf(n){ return new Intl.NumberFormat('de-CH').format(Math.round(n||0)) + " CHF"; }
+function num(n, d){ return new Intl.NumberFormat('de-CH',{maximumFractionDigits:d??0}).format(n||0); }
+
+const OCCUPIED_STATUSES = ["Vermietet", "Verkauft", "Attribuiert"];
+const FREE_STATUSES = ["Verfuegbar", "Frei"];
+const RESERVED_STATUSES = ["Reserviert"];
+
+function classify(status){
+  if (OCCUPIED_STATUSES.includes(status)) return "belegt";
+  if (RESERVED_STATUSES.includes(status)) return "reserviert";
+  if (FREE_STATUSES.includes(status)) return "frei";
+  return "unbekannt";
+}
+
+const objekte = DATA.objekte || [];
+const total = objekte.length;
+const countFrei = objekte.filter(o=>classify(o.status)==="frei").length;
+const countReserviert = objekte.filter(o=>classify(o.status)==="reserviert").length;
+const countBelegt = objekte.filter(o=>classify(o.status)==="belegt").length;
+
+// --- Quellenhinweise ---
+const notesEl = document.getElementById("sourceNotes");
+let notesHtml = `<div class="source-note">Generiert am ${DATA.generiert_am}. Quellen: mapraz-parc.ch, salezentrumworben.api.melon.sale — ausschliesslich diese, keine Annahmen.</div>`;
+if (DATA.verwendete_fallbacks && DATA.verwendete_fallbacks.length){
+  notesHtml += `<div class="source-note warn">Hinweis: ${DATA.verwendete_fallbacks.join(", ")} — letzter erfolgreicher Abruf wurde beibehalten, da der aktuelle Abruf fehlschlug.</div>`;
+}
+notesEl.innerHTML = notesHtml;
+
+// --- KPIs ---
+const kpis = [
+  {label:"Einheiten total", value: total, cls:""},
+  {label:"Frei / Verfügbar", value: countFrei, cls:"frei"},
+  {label:"Reserviert", value: countReserviert, cls:"reserviert"},
+  {label:"Vermietet / Verkauft", value: countBelegt, cls:"belegt"},
+  {label:"Vermarktungsquote", value: total ? num((countBelegt+countReserviert)/total*100,0)+" %" : "–", cls:""},
+];
+const kpiGrid = document.getElementById("kpiGrid");
+kpis.forEach(k=>{
+  const d = document.createElement("div");
+  d.className = "kpi " + k.cls;
+  d.innerHTML = `<div class="label">${k.label}</div><div class="value">${k.value}</div>`;
+  kpiGrid.appendChild(d);
+});
+
+// --- Canvas Hilfsfunktionen ---
+function setupHiDPI(canvas){
+  const ratio = window.devicePixelRatio || 1;
+  const w = canvas.width, h = canvas.height;
+  canvas.style.width = w+"px"; canvas.style.height = h+"px";
+  canvas.width = w*ratio; canvas.height = h*ratio;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ratio, ratio);
+  return {ctx, w, h};
+}
+
+function drawDonut(canvasId, items){
+  const canvas = document.getElementById(canvasId);
+  const {ctx, w, h} = setupHiDPI(canvas);
+  ctx.clearRect(0,0,w,h);
+  const cx=w/2, cy=h/2+5, rOuter=Math.min(w,h)/2-10, rInner=rOuter*0.6;
+  const total = items.reduce((s,i)=>s+i.value,0) || 1;
+  let start=-Math.PI/2;
+  items.forEach(it=>{
+    const ang=(it.value/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,rOuter,start,start+ang); ctx.closePath();
+    ctx.fillStyle=it.color; ctx.fill();
+    start+=ang;
+  });
+  ctx.beginPath(); ctx.arc(cx,cy,rInner,0,Math.PI*2); ctx.fillStyle="#fff"; ctx.fill();
+  ctx.fillStyle="#1f2430"; ctx.font="bold 20px -apple-system,sans-serif"; ctx.textAlign="center";
+  ctx.fillText(items.reduce((s,i)=>s+i.value,0), cx, cy+7);
+  ctx.font="11px -apple-system,sans-serif"; ctx.fillStyle="#6b7280";
+  ctx.fillText("Einheiten", cx, cy+23);
+
+  const legend = document.createElement("div");
+  legend.style.cssText = "display:flex;gap:14px;font-size:12px;color:#6b7280;margin-top:10px;flex-wrap:wrap;justify-content:center;";
+  legend.innerHTML = items.map(it=>`<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:50%;background:${it.color};display:inline-block;"></span>${it.label} (${it.value})</span>`).join("");
+  canvas.parentNode.appendChild(legend);
+}
+
+function drawBars(canvasId, items){
+  const canvas = document.getElementById(canvasId);
+  const {ctx, w, h} = setupHiDPI(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {top:20,right:20,bottom:40,left:40};
+  const cw = w-pad.left-pad.right, ch = h-pad.top-pad.bottom;
+  const maxVal = Math.max(...items.map(i=>i.value),1)*1.2;
+  const gap=16, barW = cw/items.length - gap;
+  ctx.strokeStyle="#e5e7eb"; ctx.fillStyle="#6b7280"; ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="right";
+  for(let s=0;s<=4;s++){
+    const y = pad.top+ch-(ch*s/4);
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(w-pad.right,y); ctx.stroke();
+    ctx.fillText(Math.round(maxVal*s/4), pad.left-8, y+4);
+  }
+  items.forEach((it,i)=>{
+    const barH = (it.value/maxVal)*ch;
+    const x = pad.left + i*(barW+gap) + gap/2;
+    const y = pad.top+ch-barH;
+    ctx.fillStyle = it.color;
+    ctx.fillRect(x,y,barW,barH);
+    ctx.fillStyle="#1f2430"; ctx.font="bold 12px -apple-system,sans-serif"; ctx.textAlign="center";
+    ctx.fillText(it.value, x+barW/2, y-6);
+    ctx.fillStyle="#6b7280"; ctx.font="11px -apple-system,sans-serif";
+    ctx.fillText(it.label, x+barW/2, pad.top+ch+16);
+  });
+}
+
+drawDonut("statusChart", [
+  {label:"Frei", value:countFrei, color:"#16a34a"},
+  {label:"Reserviert", value:countReserviert, color:"#f59e0b"},
+  {label:"Vermietet/Verkauft", value:countBelegt, color:"#2563eb"},
+]);
+
+const byProject = {};
+objekte.forEach(o=>{ byProject[o.projekt] = (byProject[o.projekt]||0)+1; });
+drawBars("projectChart", Object.keys(byProject).map((p,i)=>({
+  label:p, value:byProject[p], color: i===0 ? "#0ea5e9" : "#7c3aed"
+})));
+
+// --- Tabellen pro Projekt ---
+const tablesEl = document.getElementById("projectTables");
+const projekte = [...new Set(objekte.map(o=>o.projekt))];
+projekte.forEach(proj=>{
+  const rows = objekte.filter(o=>o.projekt===proj).sort((a,b)=>(a.referenz||"").localeCompare(b.referenz||""));
+  const frei = rows.filter(o=>classify(o.status)==="frei").length;
+  const res = rows.filter(o=>classify(o.status)==="reserviert").length;
+  const belegt = rows.filter(o=>classify(o.status)==="belegt").length;
+  const typ = rows[0]?.typ_vermarktung || "";
+  const einheit = rows[0]?.preis_einheit || "";
+
+  const section = document.createElement("div");
+  section.className = "project-section";
+  section.innerHTML = `
+    <h2>${proj} <span style="font-weight:400;color:#6b7280;font-size:13px;">(${typ})</span></h2>
+    <div class="meta">${rows.length} Einheiten &middot; Frei: ${frei} &middot; Reserviert: ${res} &middot; Vermietet/Verkauft: ${belegt}</div>
+    <table>
+      <thead><tr>
+        <th>Gebäude</th><th>Referenz</th><th>Zimmer</th><th>Fläche</th><th>Status</th><th>${einheit}</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(o=>{
+          const cls = classify(o.status);
+          return `<tr>
+            <td>${o.gebaeude||"–"}</td>
+            <td>${o.referenz||"–"}</td>
+            <td>${o.zimmer??"–"}</td>
+            <td>${o.flaeche??"–"}</td>
+            <td><span class="badge ${cls}">${o.status}</span></td>
+            <td>${chf(o.preis_chf)}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+  tablesEl.appendChild(section);
+});
+
+document.getElementById("footerNote").textContent =
+  `Automatisch generiert · ${DATA.generiert_am} · ${total} Einheiten total`;
+</script>
+</body>
+</html>
